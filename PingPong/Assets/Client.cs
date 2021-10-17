@@ -26,11 +26,18 @@ public class Client : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
         callbBacksList = new List<Action>();
-        TcpSetup();
 
+        //Comment and uncomment to use tcp or udp setups (just 1 setup)
+
+        /*---UDP---*/
+        //UdpSetup();
+        //thread = new Thread(DataLoop);
+
+        /*---TCP---*/
+        TcpSetup();
         thread = new Thread(TCPLoop);
+
         thread.Start();
 
         displayText.text = "";
@@ -156,13 +163,17 @@ public class Client : MonoBehaviour
 
         while (true)
         {
-            ReceiveData();
+            if(ReceiveData() == 0)
+            {
+                break;
+            }
 
             Thread.Sleep(500);
 
             SendData("Ping");
         }
-
+        socket.Close();
+        Debug.Log("Closing socket");
     }
 
     void SendData(string message)
@@ -171,14 +182,26 @@ public class Client : MonoBehaviour
         socket.SendTo(data, SocketFlags.None, ipepRemote);
     }
 
-    void ReceiveData()
+    int ReceiveData()
     {
-        byte[] data = new byte[256];
-        int size = socket.ReceiveFrom(data, ref ipepRemote);
+        try
+        {
+            byte[] data = new byte[256];
+            int size = socket.ReceiveFrom(data, ref ipepRemote);
+            if (size == 0)
+            {
+                return size;
+            }
+            string message = Encoding.ASCII.GetString(data, 0, size);
 
-        string message = Encoding.ASCII.GetString(data, 0, size);
-
-        AddCallbackMessage(message);
+            AddCallbackMessage(message);
+        }
+        catch (SystemException e)
+        {
+            Debug.Log("Error receiving data..Desconnecting");
+            return 0;
+        }
+        return 1;
 
     }
 
