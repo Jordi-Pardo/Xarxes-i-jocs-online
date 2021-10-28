@@ -1,5 +1,6 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.UI;
 using UnityEngine;
 using System.Net.Sockets;
 using System.Net;
@@ -18,23 +19,19 @@ public class Client : MonoBehaviour
 
     public TextFieldItem textItemPrefab;
     public Transform content;
+    public TMP_InputField inputField;
 
+    public string name = "";
 
     Thread thread;
 
-    Socket client;
 
     bool connected = false;
-    // Start is called before the first frame update
+
+
     void Start()
     {
         callbBacksList = new List<Action>();
-
-        //Comment and uncomment to use tcp or udp setups (just 1 setup)
-
-        /*---UDP---*/
-        //UdpSetup();
-        //thread = new Thread(DataLoop);
 
         /*---TCP---*/
         TcpSetup();
@@ -42,7 +39,7 @@ public class Client : MonoBehaviour
 
         thread.Start();
 
-        //displayText.text = "";
+        AddCallbackMessage("Connecting to server");
 
     }
 
@@ -54,6 +51,11 @@ public class Client : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             connected = false;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Return))
+        {
+            SendTCPData(inputField);
         }
 
         if (callbBacksList.Count > 0)
@@ -73,27 +75,11 @@ public class Client : MonoBehaviour
         if (!connected)
             return;
 
-        //SendTCPData("Hello");
-        int countToDisconnect = 5;
-        while (countToDisconnect > 0)
-        {
-            if (!connected)
-                break;
-            ReceiveTCPData();
-            countToDisconnect--;
-
-            Thread.Sleep(500);
-
-          //  SendTCPData("Hello");
-        }
-
-        Debug.Log("Disconnecting from server...");
-        socket.Shutdown(SocketShutdown.Both);
-        socket.Close();
     }
     private void TcpSetup()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
         ipep = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 1818);
         ipepRemote = (EndPoint)ipep;
     }
@@ -104,8 +90,10 @@ public class Client : MonoBehaviour
         try
         {
             socket.Connect(ipepRemote);
+    
+            AddCallbackMessage("You are connected! Write Your Name, please.");
+
             connected = true;
-            AddCallbackMessage("Connecting to server");
         }
         catch (SocketException e)
         {
@@ -116,6 +104,14 @@ public class Client : MonoBehaviour
 
     public void SendTCPData(TMP_InputField message)
     {
+        if (string.IsNullOrEmpty(name) && connected)
+        {
+            name = inputField.text;
+              //conect to server
+            inputField.text = "";
+            return;
+        }
+
         try
         {
             byte[] data = Encoding.ASCII.GetBytes(message.text);
@@ -124,11 +120,12 @@ public class Client : MonoBehaviour
         catch(System.Exception e)
         {
             Debug.Log("Sent disconnected unsafe from server");
+            AddCallbackMessage("Unable to connect. Wait for connection.");
             connected = false;
         }
-
+        inputField.text = "";
     }
-    private void ReceiveTCPData()
+    private void ReceiveTCPData(Socket socket)
     {
         try
         {
