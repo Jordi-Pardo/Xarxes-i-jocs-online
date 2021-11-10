@@ -19,7 +19,11 @@ public class Client : MonoBehaviour
 
     public TextFieldItem textItemPrefab;
     public Transform content;
-    public TMP_InputField inputField;
+    public TMP_InputField inputNameField;
+    public TMP_InputField inputMessageField;
+
+    public GameObject loginPanel;
+    public GameObject chatPanel;
 
     public string name = "";
 
@@ -35,9 +39,7 @@ public class Client : MonoBehaviour
 
         /*---TCP---*/
         TcpSetup();
-        thread = new Thread(TCPLoop);
 
-        thread.Start();
 
         AddCallbackMessage("Connecting to server");
 
@@ -55,7 +57,7 @@ public class Client : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            SendTCPData(inputField);
+            ConnectToServer();
         }
 
         if (callbBacksList.Count > 0)
@@ -70,10 +72,12 @@ public class Client : MonoBehaviour
     }
     private void TCPLoop()
     {
-        ConnectToServer();
+        //ConnectToServer();
 
         if (!connected)
             return;
+
+        ReceiveData();
 
     }
     private void TcpSetup()
@@ -85,15 +89,20 @@ public class Client : MonoBehaviour
     }
 
  
-    private void ConnectToServer()
+    public void ConnectToServer()
     {
         try
         {
             socket.Connect(ipepRemote);
-    
-            AddCallbackMessage("You are connected! Write Your Name, please.");
-
+            loginPanel.SetActive(false);
+            chatPanel.SetActive(true);
+            //AddCallbackMessage("You are connected! Write Your Name, please.");
+            SendTCPData(inputNameField);
             connected = true;
+
+            thread = new Thread(TCPLoop);
+
+            thread.Start();
         }
         catch (SocketException e)
         {
@@ -106,9 +115,9 @@ public class Client : MonoBehaviour
     {
         if (string.IsNullOrEmpty(name) && connected)
         {
-            name = inputField.text;
-              //conect to server
-            inputField.text = "";
+            name = message.text;
+            //conect to server
+            message.text = "";
             return;
         }
 
@@ -123,7 +132,7 @@ public class Client : MonoBehaviour
             AddCallbackMessage("Unable to connect. Wait for connection.");
             connected = false;
         }
-        inputField.text = "";
+        message.text = "";
     }
     private void ReceiveTCPData(Socket socket)
     {

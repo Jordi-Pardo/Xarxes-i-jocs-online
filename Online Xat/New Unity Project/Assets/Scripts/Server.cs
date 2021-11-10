@@ -126,6 +126,7 @@ public class Server : MonoBehaviour
         {
             client = socket.Accept();
             Debug.Log("Client Connected");
+            SendTCPData("Welcome to the server");
         }
         catch (System.Exception e)
         {
