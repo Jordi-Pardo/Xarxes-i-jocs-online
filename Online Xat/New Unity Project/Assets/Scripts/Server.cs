@@ -21,10 +21,9 @@ public class Server : MonoBehaviour
 
     Thread thread;
 
-    Socket client;
+    public List<Socket> clients;
 
     bool acceptingListenedConnections = true;
-
 
     string recievedmessage;
 
@@ -39,12 +38,15 @@ public class Server : MonoBehaviour
 
         /*---TCP---*/
         TcpSetup();
-        thread = new Thread(TCPLoop);
+        //thread = new Thread(TCPLoop);
 
-        thread.Start();
+        //thread.Start();
 
         AddCallbackMessage("Waiting for message...");
 
+        //Obra el server
+        //Reep connexio de client i envia mensaje de vuelta
+        //per rebre més d'una connexió en el loop (update) el socket ha de ssaber en quin estat està per fer non blocking
 
     }
 
@@ -67,6 +69,33 @@ public class Server : MonoBehaviour
                 callback();
             }
         }
+
+
+        socket.Listen(10);
+        Debug.Log("Listening sockets...");
+
+        if (socket.Poll(-1, SelectMode.SelectRead))
+        {
+            Debug.Log("Socket is readable");
+            WaitToTCPConnection();
+
+        }
+        else if (socket.Poll(-1, SelectMode.SelectWrite))
+        {
+            Debug.Log("Socket is writable");
+        }
+        else if (socket.Poll(-1, SelectMode.SelectError))
+        {
+            Debug.Log("Socket has an error");
+        }
+
+
+        for (int i = 0; i < clients.Count; i++)
+        {
+
+        }
+
+
     }
     private void TcpSetup()
     {
@@ -116,7 +145,7 @@ public class Server : MonoBehaviour
             }
         }
         Debug.Log("Shutting down");
-        client.Close();
+        //client.Close();
         socket.Close();
 
     }
@@ -124,9 +153,21 @@ public class Server : MonoBehaviour
     {
         try
         {
-            client = socket.Accept();
+            Socket client = socket.Accept();
+            clients.Add(client);
             Debug.Log("Client Connected");
-            SendTCPData("Welcome to the server");
+            //SendTCPData("Welcome to the server");
+
+            try
+            {
+                byte[] data = Encoding.ASCII.GetBytes("Welcome To the Server");
+                client.Send(data, SocketFlags.None);
+            }
+            catch (SystemException e)
+            {
+                Debug.Log("Error sending data");
+            }
+
         }
         catch (System.Exception e)
         {
@@ -140,7 +181,10 @@ public class Server : MonoBehaviour
         try
         {
             byte[] data = Encoding.ASCII.GetBytes(message);
-            client.Send(data, SocketFlags.None);
+            for (int i = 0; i < clients.Count; i++)
+            {
+                clients[i].Send(data, SocketFlags.None);
+            }
         }
         catch(SystemException e) 
         {
