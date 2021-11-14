@@ -100,9 +100,9 @@ public class Client : MonoBehaviour
             SendTCPData(inputNameField);
             connected = true;
 
-            thread = new Thread(TCPLoop);
+            //thread = new Thread(TCPLoop);
 
-            thread.Start();
+            //thread.Start();
         }
         catch (SocketException e)
         {

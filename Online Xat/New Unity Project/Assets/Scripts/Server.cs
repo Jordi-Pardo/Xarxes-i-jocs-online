@@ -125,11 +125,11 @@ public class Server : MonoBehaviour
             while (true)
             {
 
-                if (ReceiveTCPData() == 0)
-                {
-                    AddCallbackMessage("Client Disconnected");
-                    break;
-                }
+                //if (ReceiveTCPData() == 0)
+                //{
+                //    AddCallbackMessage("Client Disconnected");
+                //    break;
+                //}
 
                 Thread.Sleep(500);
                 if (!string.IsNullOrEmpty(recievedmessage))
@@ -192,29 +192,29 @@ public class Server : MonoBehaviour
         }
 
     }
-    private int ReceiveTCPData()
-    {
-        if (!client.Connected)
-            return 0;
-        try
-        {
-            byte[] data = new byte[256];
-            int size = client.Receive(data);
-            if(size == 0)
-            {
-                return size;
-            }
-            string message = Encoding.ASCII.GetString(data, 0, size);
-            recievedmessage = message;
-            AddCallbackMessage(message);
-        }
-        catch(SystemException e)
-        {
-            Debug.Log("Error receiving data..Desconnecting");
-            return 0;
-        }
-        return 1;
-    }
+    //private int ReceiveTCPData()
+    //{
+    //    if (!client.Connected)
+    //        return 0;
+    //    try
+    //    {
+    //        byte[] data = new byte[256];
+    //        int size = client.Receive(data);
+    //        if(size == 0)
+    //        {
+    //            return size;
+    //        }
+    //        string message = Encoding.ASCII.GetString(data, 0, size);
+    //        recievedmessage = message;
+    //        AddCallbackMessage(message);
+    //    }
+    //    catch(SystemException e)
+    //    {
+    //        Debug.Log("Error receiving data..Desconnecting");
+    //        return 0;
+    //    }
+    //    return 1;
+    //}
 
     void AddCallbackMessage(string message)
     {
