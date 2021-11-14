@@ -17,10 +17,12 @@ public class Client : MonoBehaviour
 
     List<Action> callbBacksList;
 
+    public UserInfo userPrefab;
     public TextFieldItem textItemPrefab;
     public Transform content;
     public TMP_InputField inputNameField;
     public TMP_InputField inputMessageField;
+    public Transform userListContainer;
 
     public GameObject loginPanel;
     public GameObject chatPanel;
@@ -50,14 +52,10 @@ public class Client : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            connected = false;
-        }
 
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            ConnectToServer();
+            SendTCPData(inputMessageField);
         }
 
         if (callbBacksList.Count > 0)
@@ -68,6 +66,22 @@ public class Client : MonoBehaviour
                 callbBacksList.RemoveAt(i);
                 callback();
             }
+        }
+
+
+        if (socket.Poll(1000, SelectMode.SelectRead))
+        {
+            Debug.Log("Socket is readable");
+            ReceiveTCPData(socket);
+        }
+        else if (socket.Poll(1000, SelectMode.SelectWrite))
+        {
+            Debug.Log("Socket is writable");
+
+        }
+        else if (socket.Poll(1000, SelectMode.SelectError))
+        {
+            Debug.Log("Socket has error");
         }
     }
     private void TCPLoop()
@@ -97,8 +111,8 @@ public class Client : MonoBehaviour
             loginPanel.SetActive(false);
             chatPanel.SetActive(true);
             //AddCallbackMessage("You are connected! Write Your Name, please.");
-            SendTCPData(inputNameField);
             connected = true;
+            SendTCPData(inputNameField);
 
             //thread = new Thread(TCPLoop);
 
@@ -113,17 +127,26 @@ public class Client : MonoBehaviour
 
     public void SendTCPData(TMP_InputField message)
     {
-        if (string.IsNullOrEmpty(name) && connected)
+        if (string.IsNullOrEmpty(message.text) || !connected)
         {
-            name = message.text;
+            //name = message.text;
             //conect to server
+            AddCallbackMessage("Disconnected");
             message.text = "";
             return;
         }
 
         try
         {
-            byte[] data = Encoding.ASCII.GetBytes(message.text);
+            Server.Message messageToSend = new Server.Message()
+            {
+                createProfile = -1,
+                message = message.text,
+                userName = ""
+                
+            };
+
+            byte[] data = Encoding.ASCII.GetBytes(JsonUtility.ToJson(messageToSend));
             socket.Send(data, SocketFlags.None);
         }
         catch(System.Exception e)
@@ -147,7 +170,15 @@ public class Client : MonoBehaviour
             }
 
             string message = Encoding.ASCII.GetString(data, 0, size);
-            AddCallbackMessage(message);
+            Server.Message messageReceived = JsonUtility.FromJson<Server.Message>(message);
+            if(messageReceived.createProfile == 1)
+            {
+                NewUserConnected(messageReceived.userName);
+                AddCallbackMessage($"{messageReceived.message}");
+                return;
+            }
+           
+            AddCallbackMessage($"{messageReceived.userName}: {messageReceived.message}");
         }
         catch(System.Exception e)
         {
@@ -157,6 +188,13 @@ public class Client : MonoBehaviour
 
 
 
+    }
+
+
+    private void NewUserConnected(string name)
+    {
+        UserInfo userProfile = Instantiate(userPrefab, userListContainer);
+        userProfile.Setup(name);
     }
     void DataLoop()
     {

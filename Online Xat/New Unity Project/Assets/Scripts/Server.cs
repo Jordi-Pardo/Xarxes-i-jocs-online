@@ -10,6 +10,21 @@ using System;
 
 public class Server : MonoBehaviour
 {
+    public class User
+    {
+        public bool firstConnection;
+        public Socket socket;
+        public string name;
+    }
+
+    [System.Serializable]
+    public class Message
+    {
+        public int createProfile;
+        public string message;
+        public string userName;
+    }
+
     List<Action> callbBacksList;
 
     public TextFieldItem textItemPrefab;
@@ -21,11 +36,13 @@ public class Server : MonoBehaviour
 
     Thread thread;
 
-    public List<Socket> clients;
+    public List<User> clients = new List<User>();
 
     bool acceptingListenedConnections = true;
 
-    string recievedmessage;
+    Message recievedmessage;
+
+    private List<User> disconnectedUsers = new List<User>();
 
     // Start is called before the first frame update
     void Start()
@@ -55,12 +72,8 @@ public class Server : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            acceptingListenedConnections = false;
-        }
 
-        if(callbBacksList.Count > 0)
+        if (callbBacksList.Count > 0)
         {
             for (int i = 0; i < callbBacksList.Count; i++)
             {
@@ -74,29 +87,70 @@ public class Server : MonoBehaviour
         socket.Listen(10);
         Debug.Log("Listening sockets...");
 
-        if (socket.Poll(-1, SelectMode.SelectRead))
+        UpdateServerSocket();
+
+        UpdateClientsSockets();
+
+    }
+
+    private void UpdateClientsSockets()
+    {
+        for (int i = 0; i < clients.Count; i++)
         {
+            if (clients[i].socket.Poll(1000, SelectMode.SelectRead))
+            {
+                Debug.Log("Client is readable");
+                if( ReceiveTCPData(clients[i]) == 0)
+                {
+                    disconnectedUsers.Add(clients[i]);
+                    clients.Remove(clients[i]);
+   
+                    return;
+                }
+
+            }
+            else if (clients[i].socket.Poll(1000, SelectMode.SelectWrite))
+            {
+                Debug.Log("Client is writable");
+            }
+            else if (clients[i].socket.Poll(1000, SelectMode.SelectError))
+            {
+                Debug.Log("Client has an error");
+            }
+        }
+
+
+        for (int i = 0; i < disconnectedUsers.Count; i++)
+        {
+            SendTCPData(new Message() { createProfile = -1, message = $"Client: {clients[i].name} has desconnected." });
+            AddCallbackMessage($"Client: {clients[i].name} has desconnected.");
+        }
+        if (disconnectedUsers.Count > 0)
+        {
+            disconnectedUsers.Clear();
+        }
+    }
+
+    private void UpdateServerSocket()
+    {
+        //Waiting for connect new user
+        if (socket.Poll(1000, SelectMode.SelectRead))
+        {
+            //New user to connect
             Debug.Log("Socket is readable");
-            WaitToTCPConnection();
+            NewUserConnected();
 
         }
-        else if (socket.Poll(-1, SelectMode.SelectWrite))
+        else if (socket.Poll(1000, SelectMode.SelectWrite))
         {
             Debug.Log("Socket is writable");
         }
-        else if (socket.Poll(-1, SelectMode.SelectError))
+        else if (socket.Poll(1000, SelectMode.SelectError))
         {
             Debug.Log("Socket has an error");
         }
-
-
-        for (int i = 0; i < clients.Count; i++)
-        {
-
-        }
-
-
     }
+
     private void TcpSetup()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -113,107 +167,168 @@ public class Server : MonoBehaviour
         }
     }
 
-    private void TCPLoop()
-    {
-        //Keep listening connection attempts
-        socket.Listen(10);
-        Debug.Log("Listening...");
-        while (acceptingListenedConnections)
-        {
-            WaitToTCPConnection();
+    //private void TCPLoop()
+    //{
+    //    //Keep listening connection attempts
+    //    socket.Listen(10);
+    //    Debug.Log("Listening...");
+    //    while (acceptingListenedConnections)
+    //    {
+    //        //WaitToTCPConnection();
 
-            while (true)
-            {
+    //        while (true)
+    //        {
 
-                //if (ReceiveTCPData() == 0)
-                //{
-                //    AddCallbackMessage("Client Disconnected");
-                //    break;
-                //}
+    //            //if (ReceiveTCPData() == 0)
+    //            //{
+    //            //    AddCallbackMessage("Client Disconnected");
+    //            //    break;
+    //            //}
 
-                Thread.Sleep(500);
-                if (!string.IsNullOrEmpty(recievedmessage))
-                {
+    //            Thread.Sleep(500);
+    //            if (!string.IsNullOrEmpty(recievedmessage))
+    //            {
 
-                    SendTCPData(recievedmessage);
-                }
-                else
-                {
-                    SendTCPData("Non recieved message");
+    //                SendTCPData(recievedmessage);
+    //            }
+    //            else
+    //            {
+    //                SendTCPData("Non recieved message");
 
-                }
-            }
-        }
-        Debug.Log("Shutting down");
-        //client.Close();
-        socket.Close();
+    //            }
+    //        }
+    //    }
+    //    Debug.Log("Shutting down");
+    //    //client.Close();
+    //    socket.Close();
 
-    }
-    private void WaitToTCPConnection()
+    //}
+    private void NewUserConnected()
     {
         try
         {
             Socket client = socket.Accept();
-            clients.Add(client);
+            clients.Add(new User() { name = "", socket = client, firstConnection = true});
             Debug.Log("Client Connected");
-            //SendTCPData("Welcome to the server");
-
-            try
-            {
-                byte[] data = Encoding.ASCII.GetBytes("Welcome To the Server");
-                client.Send(data, SocketFlags.None);
-            }
-            catch (SystemException e)
-            {
-                Debug.Log("Error sending data");
-            }
 
         }
         catch (System.Exception e)
         {
             Debug.Log("Connection failed...trying again");
         }
-
     }
 
-    private void SendTCPData(string message)
+
+    private void SendTCPData(Message message, Socket socket = null)
     {
-        try
+        if (socket == null)
         {
-            byte[] data = Encoding.ASCII.GetBytes(message);
-            for (int i = 0; i < clients.Count; i++)
+            //broadcast sockets
+            try
             {
-                clients[i].Send(data, SocketFlags.None);
+                byte[] data = Encoding.ASCII.GetBytes(JsonUtility.ToJson(message));
+                for (int i = 0; i < clients.Count; i++)
+                {
+                    clients[i].socket.Send(data, SocketFlags.None);
+                }
+            }
+            catch (SystemException e)
+            {
+                Debug.Log("Error sending data");
+            }
+
+
+        }
+        else //Only to one socket
+        {
+            try
+            {
+                byte[] data = Encoding.ASCII.GetBytes(JsonUtility.ToJson(message));
+                for (int i = 0; i < clients.Count; i++)
+                {
+                    clients[i].socket.Send(data, SocketFlags.None);
+                }
+
+            }
+            catch (SystemException e)
+            {
+                Debug.Log("Error sending data");
             }
         }
-        catch(SystemException e) 
-        {
-            Debug.Log("Error sending data");   
-        }
 
     }
-    //private int ReceiveTCPData()
+
+    private int ReceiveTCPData(User client)
+    {
+        if (!client.socket.Connected)
+            return 0;
+
+        string message = string.Empty;
+
+        try
+        {
+            byte[] data = new byte[256];
+            int size = client.socket.Receive(data);
+            if (size == 0)
+            {
+                return size;
+            }
+
+
+            message = Encoding.ASCII.GetString(data, 0, size);
+
+            Message messageReceived = new Message();
+            JsonUtility.FromJsonOverwrite(message, messageReceived);
+
+            if (client.firstConnection == true)
+            {
+                client.firstConnection = false;
+                
+                
+                client.name = messageReceived.message;
+                Message messageToSend = new Message()
+                {
+                    createProfile = 1,
+                    message = "Welcome to the server: " + client.name,
+                    userName = client.name
+                };
+                SendTCPData(messageToSend,client.socket);
+                
+                AddCallbackMessage("User: " + client.name + " has connected");
+                return 1;
+            }
+
+
+
+            recievedmessage = new Message()
+            {
+                createProfile = -1,
+                message = messageReceived.message,
+                userName = client.name,
+            };
+
+   
+           SendTCPData(recievedmessage);
+         
+
+            AddCallbackMessage(messageReceived.message);
+
+        }
+        catch (SystemException e)
+        {
+            Debug.Log("Error receiving data..Desconnecting");
+            return 0;
+        }
+        return 1;
+    }
+
+    //private void SentBroadcastMessage()
     //{
-    //    if (!client.Connected)
-    //        return 0;
-    //    try
+    //    for (int i = 0; i < clients.Count; i++)
     //    {
-    //        byte[] data = new byte[256];
-    //        int size = client.Receive(data);
-    //        if(size == 0)
-    //        {
-    //            return size;
-    //        }
-    //        string message = Encoding.ASCII.GetString(data, 0, size);
-    //        recievedmessage = message;
-    //        AddCallbackMessage(message);
+       
+    //        SendTCPData(recievedmessage);
     //    }
-    //    catch(SystemException e)
-    //    {
-    //        Debug.Log("Error receiving data..Desconnecting");
-    //        return 0;
-    //    }
-    //    return 1;
     //}
 
     void AddCallbackMessage(string message)
