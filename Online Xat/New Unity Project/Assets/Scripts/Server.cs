@@ -15,6 +15,7 @@ public class Server : MonoBehaviour
         public bool firstConnection;
         public Socket socket;
         public string name;
+
     }
 
     [System.Serializable]
@@ -23,6 +24,7 @@ public class Server : MonoBehaviour
         public int createProfile;
         public string message;
         public string userName;
+        public List<string> userNamesList = new List<string>();
     }
 
     List<Action> callbBacksList;
@@ -37,6 +39,7 @@ public class Server : MonoBehaviour
     Thread thread;
 
     public List<User> clients = new List<User>();
+    public List<string> clientsNames = new List<string>();
 
     bool acceptingListenedConnections = true;
 
@@ -49,21 +52,10 @@ public class Server : MonoBehaviour
     {
         callbBacksList = new List<Action>();
 
-        //Comment and uncomment to use tcp or udp setups (just 1 setup)
-
-
-
-        /*---TCP---*/
         TcpSetup();
-        //thread = new Thread(TCPLoop);
 
-        //thread.Start();
 
         AddCallbackMessage("Waiting for message...");
-
-        //Obra el server
-        //Reep connexio de client i envia mensaje de vuelta
-        //per rebre més d'una connexió en el loop (update) el socket ha de ssaber en quin estat està per fer non blocking
 
     }
 
@@ -104,7 +96,6 @@ public class Server : MonoBehaviour
                 {
                     disconnectedUsers.Add(clients[i]);
                     clients.Remove(clients[i]);
-   
                     return;
                 }
 
@@ -122,11 +113,12 @@ public class Server : MonoBehaviour
 
         for (int i = 0; i < disconnectedUsers.Count; i++)
         {
-            SendTCPData(new Message() { createProfile = -1, message = $"Client: {clients[i].name} has desconnected." });
-            AddCallbackMessage($"Client: {clients[i].name} has desconnected.");
+            SendTCPData(new Message() { createProfile = -1, message = " Has desconnected.", userName = disconnectedUsers[i].name });
+            AddCallbackMessage($"Client: {disconnectedUsers[i].name} has desconnected.");
         }
         if (disconnectedUsers.Count > 0)
-        {
+        {   
+           
             disconnectedUsers.Clear();
         }
     }
@@ -167,42 +159,6 @@ public class Server : MonoBehaviour
         }
     }
 
-    //private void TCPLoop()
-    //{
-    //    //Keep listening connection attempts
-    //    socket.Listen(10);
-    //    Debug.Log("Listening...");
-    //    while (acceptingListenedConnections)
-    //    {
-    //        //WaitToTCPConnection();
-
-    //        while (true)
-    //        {
-
-    //            //if (ReceiveTCPData() == 0)
-    //            //{
-    //            //    AddCallbackMessage("Client Disconnected");
-    //            //    break;
-    //            //}
-
-    //            Thread.Sleep(500);
-    //            if (!string.IsNullOrEmpty(recievedmessage))
-    //            {
-
-    //                SendTCPData(recievedmessage);
-    //            }
-    //            else
-    //            {
-    //                SendTCPData("Non recieved message");
-
-    //            }
-    //        }
-    //    }
-    //    Debug.Log("Shutting down");
-    //    //client.Close();
-    //    socket.Close();
-
-    //}
     private void NewUserConnected()
     {
         try
@@ -286,11 +242,13 @@ public class Server : MonoBehaviour
                 
                 
                 client.name = messageReceived.message;
+                clientsNames.Add(client.name);
                 Message messageToSend = new Message()
                 {
                     createProfile = 1,
                     message = "Welcome to the server: " + client.name,
-                    userName = client.name
+                    userName = client.name,
+                    userNamesList = clientsNames
                 };
                 SendTCPData(messageToSend,client.socket);
                 
@@ -305,6 +263,7 @@ public class Server : MonoBehaviour
                 createProfile = -1,
                 message = messageReceived.message,
                 userName = client.name,
+                userNamesList = clientsNames
             };
 
    
@@ -345,7 +304,6 @@ public class Server : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        thread.Abort();
         socket.Close();
     }
 }

@@ -34,6 +34,7 @@ public class Client : MonoBehaviour
 
     bool connected = false;
 
+    private List<UserInfo> userInfosList = new List<UserInfo>();
 
     void Start()
     {
@@ -114,9 +115,6 @@ public class Client : MonoBehaviour
             connected = true;
             SendTCPData(inputNameField);
 
-            //thread = new Thread(TCPLoop);
-
-            //thread.Start();
         }
         catch (SocketException e)
         {
@@ -142,7 +140,8 @@ public class Client : MonoBehaviour
             {
                 createProfile = -1,
                 message = message.text,
-                userName = ""
+                userName = "",
+                userNamesList = null,
                 
             };
 
@@ -173,7 +172,17 @@ public class Client : MonoBehaviour
             Server.Message messageReceived = JsonUtility.FromJson<Server.Message>(message);
             if(messageReceived.createProfile == 1)
             {
-                NewUserConnected(messageReceived.userName);
+                for (int i = 0; i < userInfosList.Count; i++)
+                {
+                    Destroy(userInfosList[i].gameObject);
+                }
+
+                userInfosList.Clear();
+
+                for (int i = 0; i < messageReceived.userNamesList.Count; i++)
+                {
+                    NewUserConnected(messageReceived.userNamesList[i]);
+                }
                 AddCallbackMessage($"{messageReceived.message}");
                 return;
             }
@@ -195,6 +204,7 @@ public class Client : MonoBehaviour
     {
         UserInfo userProfile = Instantiate(userPrefab, userListContainer);
         userProfile.Setup(name);
+        userInfosList.Add(userProfile);
     }
     void DataLoop()
     {
