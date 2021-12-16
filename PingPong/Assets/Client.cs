@@ -31,12 +31,12 @@ public class Client : MonoBehaviour
         //Comment and uncomment to use tcp or udp setups (just 1 setup)
 
         /*---UDP---*/
-        //UdpSetup();
-        //thread = new Thread(DataLoop);
+        UdpSetup();
+        thread = new Thread(DataLoop);
 
         /*---TCP---*/
-        TcpSetup();
-        thread = new Thread(TCPLoop);
+        //TcpSetup();
+        //thread = new Thread(TCPLoop);
 
         thread.Start();
 
@@ -92,14 +92,14 @@ public class Client : MonoBehaviour
     private void TcpSetup()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        ipep = new IPEndPoint(IPAddress.Parse("192.168.0.29"), 1818);
+        ipep = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 1818);
         ipepRemote = (EndPoint)ipep;
     }
 
     private void UdpSetup()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        ipep = new IPEndPoint(IPAddress.Parse("192.168.0.29"), 1818);
+        ipep = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 1818);
         ipepRemote = (EndPoint)ipep;
     }
 
